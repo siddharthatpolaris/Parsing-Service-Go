@@ -11,6 +11,8 @@ import (
 	decoderServiceInt "parsing-service/apps/decoder/service_interfaces"
 	decoderServices "parsing-service/apps/decoder/services"
 
+	routers "parsing-service/routers"
+
 	"go.uber.org/fx"
 )
 
@@ -41,7 +43,18 @@ var decoderModule = fx.Options(
 		decoderController.NewDecoderController,
 		fx.Annotate(
 			decoderServices.NewKafkaConsumerHandler,
+			fx.As(new(decoderServiceInt.IDecoderKafkaConsumerService)),
+		),
+		fx.Annotate(
+			decoderServices.NewDecoder,
 			fx.As(new(decoderServiceInt.IDecoderService)),
 		),
+	),
+)
+
+
+var routerModule = fx.Options(
+	fx.Provide(
+		routers.NewHandler,
 	),
 )

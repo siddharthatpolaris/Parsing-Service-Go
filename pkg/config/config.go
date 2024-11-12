@@ -40,8 +40,8 @@ type RedisConfig struct {
 }
 
 type KafkaTopicsConfig struct {
-	Fetch_Data_Kafka_Topic_GROUP_ID string
-	Fetch_Data_Kafka_Topic_NAME     string
+	FETCH_DATA_KAFKA_TOPIC_GROUP_ID string
+	FETCH_DATA_KAFKA_TOPIC_NAME     string
 }
 
 type BusinessLogicConfig struct {
@@ -96,8 +96,8 @@ func SetupConfig() (*Configuration, error) {
 		},
 
 		KafkaTopicsConfig: KafkaTopicsConfig{
-			Fetch_Data_Kafka_Topic_GROUP_ID:  viper.GetString("Fetch_Data_Kafka_Topic_GROUP_ID"),
-			Fetch_Data_Kafka_Topic_NAME: viper.GetString("Fetch_Data_Kafka_Topic_NAME"),
+			FETCH_DATA_KAFKA_TOPIC_GROUP_ID:  viper.GetString("Fetch_Data_Kafka_Topic_GROUP_ID"),
+			FETCH_DATA_KAFKA_TOPIC_NAME: viper.GetString("Fetch_Data_Kafka_Topic_NAME"),
 		},
 
 		BusinessLogicConfig: BusinessLogicConfig{

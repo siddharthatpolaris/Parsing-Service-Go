@@ -5,6 +5,7 @@ import (
 	"parsing-service/pkg/config"
 	"parsing-service/pkg/database"
 	"parsing-service/pkg/logger"
+	"parsing-service/routers"
 	"sync"
 
 	"go.uber.org/fx"
@@ -17,14 +18,17 @@ func LoadDependecies() {
 		loggerModule,
 		kafkaFactoy,
 		decoderModule,
+		routerModule,
 
 		fx.Invoke(StartKafkaConsumer),
+
+		fx.Invoke(serveHttpRequests),
 	)
 }
 
 func StartKafkaConsumer(
 	logger logger.ILogger,
-	decoderHandler decoderServiceIntf.IDecoderService,
+	decoderHandler decoderServiceIntf.IDecoderKafkaConsumerService,
 ) {
 	var wg sync.WaitGroup
 	wg.Add(1)
@@ -33,7 +37,6 @@ func StartKafkaConsumer(
 		decoderHandler.FetchData()
 	}()
 
-	wg.Wait()
 }
 
 func initializeConnectionsAndConfig(logger logger.ILogger) {
@@ -45,5 +48,9 @@ func initializeConnectionsAndConfig(logger logger.ILogger) {
 	if err != nil {
 		logger.Fatalf("erorr while setting DB connection in <initializeConnectionsAndConfig>:%v", err)
 	}
+}
 
+
+func serveHttpRequests(r *routers.Routes) {
+	logger.GetLogger().Fatalf("%v", r.Router.Run(config.ServerConfig()))
 }
