@@ -194,19 +194,19 @@ func NewTAPPacket() *TAPPacket {
 	}
 }
 
-func getDcuPortAndOffset(part []byte) (int, int) {
-	var offset int
-	dcuPort := 0
-	if dcuPort == 0 {
-		offset = 4
-		dcuPort = int(part[len(part)-4])<<24 | int(part[len(part)-3])<<16 | int(part[len(part)-2])<<8 | int(part[len(part)-1])
-	} else {
-		offset = 0
-		// dcuPort remains unchanged
-	}
+// func getDcuPortAndOffset(part []byte) (int, int) {
+// 	var offset int
+// 	dcuPort := 0
+// 	if dcuPort == 0 {
+// 		offset = 4
+// 		dcuPort = int(part[len(part)-4])<<24 | int(part[len(part)-3])<<16 | int(part[len(part)-2])<<8 | int(part[len(part)-1])
+// 	} else {
+// 		offset = 0
+// 		// dcuPort remains unchanged
+// 	}
 
-	return dcuPort, offset
-}
+// 	return dcuPort, offset
+// }
 
 func checkPacketIntegrity(part []byte, offset int, dcuPort int) (bool, error) {
 	if (len(part) < 18 && offset == 4) || (len(part) < 14 && offset == 0) {
@@ -298,4 +298,28 @@ func getMyTapPacket(part []byte, offset int) (*TAPPacket, error) {
 	}
 
 	return myTapPacket, nil
+}
+
+func getTwUplinkPackets(data []byte) ([]map[string]interface{}, error) {
+	twPacket := NewTapWrapperPacket()
+	var tapPackets []map[string]interface{}
+	isValid := twPacket.validateUplinkPacket(data) 
+
+	if isValid {
+		dataLen := len(data) - 10
+		index := 4
+
+		for (dataLen > index) {
+			newIndex, tempPacket := twPacket.deframeUplinkPacket(data, index)
+			index += newIndex
+			if tempPacket["MessageType"] == "Uplink_Msg" {
+				tapPackets = append(tapPackets, tempPacket)
+			}
+			st := fmt.Sprintf("dataLen %d, Index %d  info %v", dataLen, index, tempPacket)
+			fmt.Println(st)
+		}
+		return tapPackets, nil
+	}
+	return nil, errors.New("invalid wp packet")
+
 }

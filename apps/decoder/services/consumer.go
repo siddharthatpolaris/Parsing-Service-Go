@@ -118,45 +118,104 @@ func GetBytes(key interface{}) ([]byte, error) {
 	return buf.Bytes(), nil
 
 }
+
 func (k *kafkaConusmerHandler) processPackets(msg interface{}) {
 	msgMap, ok := msg.(map[string]interface{})
 	if !ok {
 		fmt.Println("Error: message is not a map", ok)
 		return
 	}
-
-	// payload := []byte(fmt.Sprintf("%v", msgMap["payload"]))
+	// fmt.Println(msgMap["payload"])
+	// payload, err := GetBytes(msgMap["payload"])
+	// if err != nil {
+	// 	fmt.Println("Error in byte conversion of payload", err)
+	// }
 	// fmt.Println(payload)
 
-	// fmt.Println(splittedPayload)
-	payload, err := GetBytes(msgMap["payload"])
-	if err != nil {
-		fmt.Println("Error in byte conversion", err)
-	}
-	fmt.Println(payload)
-	splittedPayload := bytes.Split(payload, []byte("RECT"))
-	// fmt.Println(splittedPayload)
-
-	// fmt.Println(len(splittedPayload))
-	for _, part := range splittedPayload {
-		dcuPort, offset := getDcuPortAndOffset(part)
-		packetIntegrityFlag, err := checkPacketIntegrity(part, offset, dcuPort)
-
-		if packetIntegrityFlag == true && err == nil {
-			myTapPacket, err := getMyTapPacket(part, offset)
-			if err != nil {
-				fmt.Printf("Error in getting tap packet: %v", err)
-				continue
-			}
-
-			ok := getCmdIDAndMeterIp(myTapPacket)
-			if ok != nil {
-				fmt.Println("Error in getting CmdID and MeterIp", ok)
-			}
-		} else {
-			fmt.Println("Packet Integrity fail!", err)
+	//wp gateway mode
+	// fmt.Println(payload[0])
+	// fmt.Println( msgMap["payload"].([]interface{})[0])
+	if msgMap["payload"].([]interface{})[0] == 0xFE {
+		// fmt.Println("---------------------------------------------------")
+		payload, err := GetBytes(msgMap["payload"])
+		if err != nil {
+			fmt.Println("Error in byte conversion of payload", err)
+		}
+		wpInfoPackets, err := getTwUplinkPackets(payload)
+		if err != nil {
+			fmt.Println("WP PAcket Issue", err)
+			return
 		}
 
+		fmt.Println("Total No of tap packets found from WP_UNWRAP", len(wpInfoPackets))
+		if len(wpInfoPackets) > 0 {
+			for _, tempPacket := range wpInfoPackets {
+				wpTapPacket := tempPacket["TAP"].(interface{})
+				wpTapPacketBytes, err := GetBytes(wpTapPacket)
+				if err != nil {
+					fmt.Println("Error in byte conversion of wpTapPackets", err)
+					continue
+				}
+
+				//handling meta-data
+				msgMap["gatewayMode"] = "wp"
+				if sinkID, ok := tempPacket["sinkId"]; ok {
+					msgMap["sinkId"] = sinkID
+				} else {
+					msgMap["sinkId"] = 1
+				}
+				// dcuTime := tempPacket["DcuTime"]
+
+				offset := 0
+				dcuPort := tempPacket["DcuNumber"].(int)
+
+				packetIntegrityFlag, err := checkPacketIntegrity(wpTapPacketBytes, offset, dcuPort)
+
+				if packetIntegrityFlag == true && err == nil {
+					myTapPacket, err := getMyTapPacket(wpTapPacketBytes, offset)
+					if err != nil {
+						fmt.Printf("Error in getting tap packet: %v", err)
+						continue
+					}
+
+					ok := getCmdIDAndMeterIp(myTapPacket)
+					if ok != nil {
+						fmt.Println("Error in getting CmdID and MeterIp", ok)
+					}
+				} else {
+					fmt.Println("Packet Integrity fail!", err)
+				}
+			}
+		}
+	} else { // irda gateway mode
+		payload, err := GetBytes(msgMap["payload"])
+		if err != nil {
+			fmt.Println("Error in byte conversion of payload", err)
+		}
+		splittedPayload := bytes.Split(payload, []byte("RECT"))
+
+		for _, part := range splittedPayload {
+			// dcuPort, offset := getDcuPortAndOffset(part)
+			dcuPort := 0
+			offset := 4
+			packetIntegrityFlag, err := checkPacketIntegrity(part, offset, dcuPort)
+
+			if packetIntegrityFlag == true && err == nil {
+				myTapPacket, err := getMyTapPacket(part, offset)
+				if err != nil {
+					fmt.Printf("Error in getting tap packet: %v", err)
+					continue
+				}
+
+				ok := getCmdIDAndMeterIp(myTapPacket)
+				if ok != nil {
+					fmt.Println("Error in getting CmdID and MeterIp", ok)
+				}
+			} else {
+				fmt.Println("Packet Integrity fail!", err)
+			}
+
+		}
 	}
 
 }
