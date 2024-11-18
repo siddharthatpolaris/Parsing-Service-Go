@@ -98,17 +98,19 @@ func (p *tapWrapperPacket) validateUplinkPacket(data []byte) bool {
 		p.rxCrc = crc16xModem(buf)
 	}
 
+	status := "fail"
 	retVal := false
 	if p.crc == byte(p.rxCrc) {
 		// p.rxCrc = "Pass"
 		retVal = true
+		status = "pass"
 	}
 
 	st := fmt.Sprintf("Sink-Id        : %d\n"+
-		"DcuTime        : %s\n"+
+		"DcuTime        : %d\n"+
 		"DcuNumber      : %d\n"+
 		"CrcStatus      : %s",
-		p.sinkID, p.uplinkMsgDcuTime, p.uplinkMsgDcuNum, "pass")
+		p.sinkID, p.uplinkMsgDcuTime, p.uplinkMsgDcuNum, status)
 
 	fmt.Println(st)
 
@@ -124,13 +126,16 @@ func hexValuesFromBytes(data []byte) string {
 }
 
 func (p *tapWrapperPacket) deframeUplinkPacket(data []byte, index int) (int, map[string]interface{}) {
+	// fmt.Println("z")
 	p.protocolVersion = data[index+0]
-	p.messageType = string(data[index+1])
+	messageType := (data[index+1])
+	// fmt.Println(int(data[index+1]))
+	// p.messageType = string(data[index+1])
 
 	respData := make(map[string]interface{})
 
-	switch p.messageType {
-	case "1":
+	switch messageType {
+	case 1:
 		p.messageType = "Downlink_Sent_Status_Msg"
 		p.messageID = data[index+2]
 		p.downlinkMsgSentStatus = []byte{data[index+3]}
@@ -155,7 +160,7 @@ func (p *tapWrapperPacket) deframeUplinkPacket(data []byte, index int) (int, map
 		fmt.Println(st)
 		return 4, respData
 
-	case "2":
+	case 2:
 		p.messageType = "Uplink_Msg"
 		p.uplinkMsgSrcAddress = (data[index+2]) + (data[index+3] << 8) + (data[index+4] << 16) + (data[index+5] << 24)
 		p.uplinkMsgDestAddress = (data[index+6]) + (data[index+7] << 8) + (data[index+8] << 16) + (data[index+9] << 24)
@@ -172,7 +177,10 @@ func (p *tapWrapperPacket) deframeUplinkPacket(data []byte, index int) (int, map
 		p.uplinkMsgRxQos = data[index+16]
 		p.uplinkMsgMsgLen = data[index+17]
 		p.uplinkMsgHopCnt = data[index+18]
-		p.uplinkTapMsg = data[index+19 : index+19+int(p.uplinkMsgMsgLen)]
+		p.uplinkTapMsg = []byte{0}
+		if(len(data) >= index+19+int(p.uplinkMsgMsgLen)) {
+			p.uplinkTapMsg = (data[index+19 : index+19+int(p.uplinkMsgMsgLen)])
+		}
 		hexValues := hexValuesFromBytes(p.uplinkTapMsg)
 
 		respData["sinkId"] = p.sinkID
@@ -226,7 +234,7 @@ func (p *tapWrapperPacket) deframeUplinkPacket(data []byte, index int) (int, map
 		fmt.Println(st)
 		return (19 + int(p.uplinkMsgMsgLen)), respData
 
-	case "4":
+	case 4:
 		p.messageType = "Set_App_Config_Resp_Msg"
 		p.downlinkMsgSentStatus = []byte{data[index+2]}
 
@@ -251,7 +259,7 @@ func (p *tapWrapperPacket) deframeUplinkPacket(data []byte, index int) (int, map
 		fmt.Println(st)
 		return 3, respData
 
-	case "6":
+	case 6:
 		p.messageType = "Set_Sink_Config_Resp_Msg"
 		p.downlinkMsgSentStatus = []byte{data[index+2]}
 
@@ -276,7 +284,7 @@ func (p *tapWrapperPacket) deframeUplinkPacket(data []byte, index int) (int, map
 		fmt.Println(st)
 		return 3, respData
 
-	case "8":
+	case 8:
 		p.messageType = "Set_Diag_Resp_Msg"
 		p.downlinkMsgSentStatus = []byte{data[index+2]}
 
@@ -301,7 +309,7 @@ func (p *tapWrapperPacket) deframeUplinkPacket(data []byte, index int) (int, map
 		fmt.Println(st)
 		return 3, respData
 
-	case "10":
+	case 10:
 		p.messageType = "Get_App_Config_Msg"
 		p.downlinkMsgSentStatus = (data[index+2 : index+82])
 		hexValues := hexValuesFromBytes(p.downlinkMsgSentStatus)
@@ -315,7 +323,7 @@ func (p *tapWrapperPacket) deframeUplinkPacket(data []byte, index int) (int, map
 
 		st := fmt.Sprintf(
 			"RecvPacket     : %s \n"+
-				"Config         : %d \n"+
+				"Config         : %s \n"+
 				"DcuTime        : %d \n"+
 				"DcuNumber      : %d \n",
 			p.messageType,
@@ -327,7 +335,7 @@ func (p *tapWrapperPacket) deframeUplinkPacket(data []byte, index int) (int, map
 		fmt.Println(st)
 		return 82, respData
 
-	case "12":
+	case 12:
 		p.messageType = "Get_Sink_Config_Msg"
 		p.downlinkMsgSentStatus = data[index+2 : index+12]
 		hexValues := hexValuesFromBytes(p.downlinkMsgSentStatus)
@@ -341,7 +349,7 @@ func (p *tapWrapperPacket) deframeUplinkPacket(data []byte, index int) (int, map
 
 		st := fmt.Sprintf(
 			"RecvPacket     : %s \n"+
-				"Config         : %d \n"+
+				"Config         : %s \n"+
 				"DcuTime        : %d \n"+
 				"DcuNumber      : %d \n",
 			p.messageType,
@@ -353,7 +361,7 @@ func (p *tapWrapperPacket) deframeUplinkPacket(data []byte, index int) (int, map
 		fmt.Println(st)
 		return 12, respData
 
-	case "14":
+	case 14:
 		p.messageType = "Get_Diag_Msg"
 		p.downlinkMsgSentStatus = []byte{(data[index+2]) + (data[index+3] << 8)}
 
@@ -378,7 +386,7 @@ func (p *tapWrapperPacket) deframeUplinkPacket(data []byte, index int) (int, map
 		fmt.Println(st)
 		return 4, respData
 
-	case "16":
+	case 16:
 		p.messageType = "Set_Stack_State_Resp_Msg"
 		p.downlinkMsgSentStatus = []byte{data[index+2]}
 
@@ -403,7 +411,7 @@ func (p *tapWrapperPacket) deframeUplinkPacket(data []byte, index int) (int, map
 		fmt.Println(st)
 		return 3, respData
 
-	case "31":
+	case 31:
 		p.messageType = "Set_Otap_Action_Resp_Msg"
 		p.downlinkMsgSentStatus = []byte{data[index+2]}
 
@@ -428,7 +436,7 @@ func (p *tapWrapperPacket) deframeUplinkPacket(data []byte, index int) (int, map
 		fmt.Println(st)
 		return 3, respData
 
-	case "33":
+	case 33:
 		p.messageType = "Get_Otap_Action_Resp_Msg"
 		p.uplinkTapMsg = data[index+2 : index+2+5]
 		hexValues := hexValuesFromBytes(p.uplinkTapMsg)
@@ -443,7 +451,7 @@ func (p *tapWrapperPacket) deframeUplinkPacket(data []byte, index int) (int, map
 		st := fmt.Sprintf(
 			"MsgVersion     : %d \n"+
 				"MessageType    : %s \n"+
-				"Status         : %d \n"+
+				"Status         : %s \n"+
 				"DcuTime        : %d \n"+
 				"DcuNumber      : %d \n",
 			p.protocolVersion,
@@ -455,7 +463,7 @@ func (p *tapWrapperPacket) deframeUplinkPacket(data []byte, index int) (int, map
 		fmt.Println(st)
 		return 7, respData
 
-	case "35":
+	case 35:
 		p.messageType = "Upload_ScratchPad_Chunk_Resp_Msg"
 		p.downlinkMsgSentStatus = []byte{data[index+2]}
 
@@ -480,7 +488,7 @@ func (p *tapWrapperPacket) deframeUplinkPacket(data []byte, index int) (int, map
 		fmt.Println(st)
 		return 3, respData
 
-	case "37":
+	case 37:
 		p.messageType = "Process_ScratchPad_Resp_Msg"
 		p.downlinkMsgSentStatus = []byte{data[index+2]}
 
@@ -505,10 +513,14 @@ func (p *tapWrapperPacket) deframeUplinkPacket(data []byte, index int) (int, map
 		fmt.Println(st)
 		return 3, respData
 
-	case "129":
+	case 129:
 		p.messageType = "Dcu_Resp_Msg"
 		p.uplinkMsgMsgLen = data[index+13]
-		p.uplinkTapMsg = data[index+2 : index+2+14+int(p.uplinkMsgMsgLen)]
+		p.uplinkTapMsg = []byte{0}
+		if(len(data) >= index+2+14+int(p.uplinkMsgMsgLen)) {
+			p.uplinkTapMsg = (data[index+2 : index+2+14+int(p.uplinkMsgMsgLen)])
+		}
+		// p.uplinkTapMsg = data[index+2 : index+2+14+int(p.uplinkMsgMsgLen)]
 		hexValues := hexValuesFromBytes(p.uplinkTapMsg)
 
 		respData["sinkId"] = p.sinkID
@@ -521,7 +533,7 @@ func (p *tapWrapperPacket) deframeUplinkPacket(data []byte, index int) (int, map
 		st := fmt.Sprintf(
 			"MsgVersion     : %d \n"+
 				"MessageType    : %s \n"+
-				"Status         : %d \n"+
+				"Status         : %s \n"+
 				"DcuTime        : %d \n"+
 				"DcuNumber      : %d \n",
 			p.protocolVersion,
@@ -533,10 +545,14 @@ func (p *tapWrapperPacket) deframeUplinkPacket(data []byte, index int) (int, map
 		fmt.Println(st)
 		return (16 + int(p.uplinkMsgMsgLen)), respData
 
-	case "130":
+	case 130:
 		p.messageType = "Dcu_Diag_Resp_Msg"
 		p.uplinkMsgMsgLen = data[index+13]
-		p.uplinkTapMsg = data[index+2 : index+2+14+int(p.uplinkMsgMsgLen)]
+		p.uplinkTapMsg = []byte{0}
+		if(len(data) >= index+2+14+int(p.uplinkMsgMsgLen)) {
+			p.uplinkTapMsg = (data[index+2 : index+2+14+int(p.uplinkMsgMsgLen)])
+		}
+		// p.uplinkTapMsg = data[index+2 : index+2+14+int(p.uplinkMsgMsgLen)]
 		hexValues := hexValuesFromBytes(p.uplinkTapMsg)
 
 		respData["sinkId"] = p.sinkID
@@ -549,7 +565,7 @@ func (p *tapWrapperPacket) deframeUplinkPacket(data []byte, index int) (int, map
 		st := fmt.Sprintf(
 			"MsgVersion     : %d \n"+
 				"MessageType    : %s \n"+
-				"Status         : %d \n"+
+				"Status         : %s \n"+
 				"DcuTime        : %d \n"+
 				"DcuNumber      : %d \n",
 			p.protocolVersion,

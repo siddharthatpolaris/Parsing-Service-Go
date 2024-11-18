@@ -158,6 +158,7 @@ func crc16UsingPolynomialAndInitialValue(data []byte) uint16 {
 }
 
 func (packet1 *TAPPacket) Deserialize(buf []byte) error {
+	
 	// fmt.Println("Step-1 Bytes for Deserialize are", buf, "length", len(buf))
 	// log.Printf("TAP Decoding Packet Payload %x ",buf)
 

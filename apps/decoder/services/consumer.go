@@ -118,6 +118,27 @@ func GetBytes(key interface{}) ([]byte, error) {
 	return buf.Bytes(), nil
 
 }
+func ConvertPayloadToBytes(payload interface{}) ([]byte, error) {
+	// Assert that payload is a slice of interfaces ([]interface{})
+	interfaceSlice, ok := payload.([]interface{})
+	if !ok {
+		return nil, fmt.Errorf("payload is not a slice of interface{}")
+	}
+
+	// Convert each element to a byte
+	byteSlice := make([]byte, len(interfaceSlice))
+	for i, v := range interfaceSlice {
+		// Assert that each element can be converted to a float64
+		floatVal, ok := v.(float64)
+		if !ok {
+			return nil, fmt.Errorf("element %d in payload is not a float64", i)
+		}
+		// Convert float64 to byte (assuming the values are valid byte values, i.e., 0-255)
+		byteSlice[i] = byte(floatVal)
+	}
+
+	return byteSlice, nil
+}
 
 func (k *kafkaConusmerHandler) processPackets(msg interface{}) {
 	msgMap, ok := msg.(map[string]interface{})
@@ -125,37 +146,37 @@ func (k *kafkaConusmerHandler) processPackets(msg interface{}) {
 		fmt.Println("Error: message is not a map", ok)
 		return
 	}
-	// fmt.Println(msgMap["payload"])
-	// payload, err := GetBytes(msgMap["payload"])
-	// if err != nil {
-	// 	fmt.Println("Error in byte conversion of payload", err)
-	// }
-	// fmt.Println(payload)
+	
 
-	//wp gateway mode
-	// fmt.Println(payload[0])
-	// fmt.Println( msgMap["payload"].([]interface{})[0])
-	if msgMap["payload"].([]interface{})[0] == 0xFE {
-		// fmt.Println("---------------------------------------------------")
-		payload, err := GetBytes(msgMap["payload"])
+	payload, err := ConvertPayloadToBytes(msgMap["payload"])
+	if err != nil {
+		fmt.Println("Error in byte conversion of payload", err)
+	}
+	
+	fmt.Println( (msgMap["payload"].([]interface{})[0].(float64)))
+
+	if payload[0] == 0xFE {
+		// return
+
+		payload, err := ConvertPayloadToBytes(msgMap["payload"])
 		if err != nil {
 			fmt.Println("Error in byte conversion of payload", err)
 		}
 		wpInfoPackets, err := getTwUplinkPackets(payload)
 		if err != nil {
-			fmt.Println("WP PAcket Issue", err)
+			fmt.Println("WP Packet Issue", err)
 			return
 		}
 
 		fmt.Println("Total No of tap packets found from WP_UNWRAP", len(wpInfoPackets))
 		if len(wpInfoPackets) > 0 {
 			for _, tempPacket := range wpInfoPackets {
-				wpTapPacket := tempPacket["TAP"].(interface{})
-				wpTapPacketBytes, err := GetBytes(wpTapPacket)
-				if err != nil {
-					fmt.Println("Error in byte conversion of wpTapPackets", err)
-					continue
-				}
+				wpTapPacket := tempPacket["TAP"].([]byte)
+				// wpTapPacketBytes, err := ConvertPayloadToBytes(wpTapPacket)
+				// if err != nil {
+				// 	fmt.Println("Error in byte conversion of wpTapPackets", err)
+				// 	continue
+				// }
 
 				//handling meta-data
 				msgMap["gatewayMode"] = "wp"
@@ -167,12 +188,12 @@ func (k *kafkaConusmerHandler) processPackets(msg interface{}) {
 				// dcuTime := tempPacket["DcuTime"]
 
 				offset := 0
-				dcuPort := tempPacket["DcuNumber"].(int)
+				dcuPort := int(tempPacket["DcuNumber"].(uint8))
 
-				packetIntegrityFlag, err := checkPacketIntegrity(wpTapPacketBytes, offset, dcuPort)
+				packetIntegrityFlag, err := checkPacketIntegrity(wpTapPacket, offset, dcuPort)
 
 				if packetIntegrityFlag == true && err == nil {
-					myTapPacket, err := getMyTapPacket(wpTapPacketBytes, offset)
+					myTapPacket, err := getMyTapPacket(wpTapPacket, offset)
 					if err != nil {
 						fmt.Printf("Error in getting tap packet: %v", err)
 						continue
@@ -188,7 +209,9 @@ func (k *kafkaConusmerHandler) processPackets(msg interface{}) {
 			}
 		}
 	} else { // irda gateway mode
-		payload, err := GetBytes(msgMap["payload"])
+		// return
+		// payload, err := GetBytes(msgMap["payload"])
+		payload, err := ConvertPayloadToBytes(msgMap["payload"])
 		if err != nil {
 			fmt.Println("Error in byte conversion of payload", err)
 		}

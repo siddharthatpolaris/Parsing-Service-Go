@@ -194,20 +194,6 @@ func NewTAPPacket() *TAPPacket {
 	}
 }
 
-// func getDcuPortAndOffset(part []byte) (int, int) {
-// 	var offset int
-// 	dcuPort := 0
-// 	if dcuPort == 0 {
-// 		offset = 4
-// 		dcuPort = int(part[len(part)-4])<<24 | int(part[len(part)-3])<<16 | int(part[len(part)-2])<<8 | int(part[len(part)-1])
-// 	} else {
-// 		offset = 0
-// 		// dcuPort remains unchanged
-// 	}
-
-// 	return dcuPort, offset
-// }
-
 func checkPacketIntegrity(part []byte, offset int, dcuPort int) (bool, error) {
 	if (len(part) < 18 && offset == 4) || (len(part) < 14 && offset == 0) {
 		if len(part) > 0 {
@@ -227,7 +213,7 @@ func checkPacketIntegrity(part []byte, offset int, dcuPort int) (bool, error) {
 
 		if len(part) >= 11 {
 			stopBytePos := 11 + int(part[10])
-
+			fmt.Println(stopBytePos)
 			if len(part) >= stopBytePos + 2 {
 				order := "normal"
 				crcInPacket, err := DeserializeUInt16(part[stopBytePos:stopBytePos+2], order)
@@ -282,17 +268,25 @@ func getMyTapPacket(part []byte, offset int) (*TAPPacket, error) {
 	}
 
 	if ((part[0] & part[1] & part[2] & part[3]) == 0xff) || (cmdID >= 59900 && cmdID < 60050) {
+		// fmt.Println("x")
 		err := myTapPacket.Deserialize(part[0:stopBytePos])
 		if err != nil {
 			fmt.Println("error in deserializing tap packet")
 			return myTapPacket, err
 		}
 	} else {
-		err := myTapPacket.Deserialize(part[0 : stopBytePos-offset])
-		if err != nil {
-			fmt.Println("error in deserializing tap packet")
+		// fmt.Println("y")
+		if len(part) >= stopBytePos - offset {
+			err := myTapPacket.Deserialize(part[0 : stopBytePos-offset])
+			if err != nil {
+				fmt.Println("error in deserializing tap packet")
+				return myTapPacket, err
+			}
+		}else {
+			fmt.Println("error in part size before deserializing tap packet")
 			return myTapPacket, err
 		}
+		
 		//----
 		myTapPacket.DataLen -= uint8(offset)		
 	}
@@ -308,6 +302,8 @@ func getTwUplinkPackets(data []byte) ([]map[string]interface{}, error) {
 	if isValid {
 		dataLen := len(data) - 10
 		index := 4
+		// dataLen := 2
+		// index :=0
 
 		for (dataLen > index) {
 			newIndex, tempPacket := twPacket.deframeUplinkPacket(data, index)
@@ -318,6 +314,7 @@ func getTwUplinkPackets(data []byte) ([]map[string]interface{}, error) {
 			st := fmt.Sprintf("dataLen %d, Index %d  info %v", dataLen, index, tempPacket)
 			fmt.Println(st)
 		}
+		fmt.Println(len(tapPackets))
 		return tapPackets, nil
 	}
 	return nil, errors.New("invalid wp packet")
