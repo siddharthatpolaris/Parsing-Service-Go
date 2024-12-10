@@ -42,6 +42,13 @@ type RedisConfig struct {
 type KafkaTopicsConfig struct {
 	FETCH_DATA_KAFKA_TOPIC_GROUP_ID string
 	FETCH_DATA_KAFKA_TOPIC_NAME     string
+
+	PRODUCE_INVALID_TAP_KAFKA_TOPIC_NAME     string
+	PRODUCE_INVALID_WP_KAFKA_TOPIC_NAME     string
+	PRODUCE_DCU_DIAGNOSTIC_KAFKA_TOPIC_NAME     string
+	PRODUCE_DOWN_ACK_KAFKA_TOPIC_NAME     string
+	PRODUCE_SINK_CHANGE_KAFKA_TOPIC_NAME     string
+
 }
 
 type BusinessLogicConfig struct {
@@ -88,21 +95,25 @@ func SetupConfig() (*Configuration, error) {
 		},
 
 		RedisConfig: RedisConfig{
-			Host:                   viper.GetString("REDIS_HOST"),
-			Port:                   viper.GetString("REDIS_PORT"),
-			Password:               viper.GetString("REDIS_PASSWORD"),
-			REDIS_DISABLE_TLS:      viper.GetBool("REDIS_DISABLE_TLS"),
-			DefaultDBNumber:        viper.GetInt("REDIS_DEFAULT_DB_NUMBER"),
+			Host:              viper.GetString("REDIS_HOST"),
+			Port:              viper.GetString("REDIS_PORT"),
+			Password:          viper.GetString("REDIS_PASSWORD"),
+			REDIS_DISABLE_TLS: viper.GetBool("REDIS_DISABLE_TLS"),
+			DefaultDBNumber:   viper.GetInt("REDIS_DEFAULT_DB_NUMBER"),
 		},
 
 		KafkaTopicsConfig: KafkaTopicsConfig{
-			FETCH_DATA_KAFKA_TOPIC_GROUP_ID:  viper.GetString("Fetch_Data_Kafka_Topic_GROUP_ID"),
-			FETCH_DATA_KAFKA_TOPIC_NAME: viper.GetString("Fetch_Data_Kafka_Topic_NAME"),
+			FETCH_DATA_KAFKA_TOPIC_GROUP_ID: viper.GetString("FETCH_DATA_KAFKA_TOPIC_GROUP_ID"),
+			FETCH_DATA_KAFKA_TOPIC_NAME:     viper.GetString("FETCH_DATA_KAFKA_TOPIC_NAME"),
+
+			PRODUCE_INVALID_TAP_KAFKA_TOPIC_NAME:     viper.GetString("PRODUCE_INVALID_TAP_KAFKA_TOPIC_NAME"),
+			PRODUCE_INVALID_WP_KAFKA_TOPIC_NAME:     viper.GetString("PRODUCE_INVALID_WP_KAFKA_TOPIC_NAME"),
+			PRODUCE_DCU_DIAGNOSTIC_KAFKA_TOPIC_NAME:     viper.GetString("PRODUCE_DCU_DIAGNOSTIC_KAFKA_TOPIC_NAME"),
+			PRODUCE_DOWN_ACK_KAFKA_TOPIC_NAME:     viper.GetString("PRODUCE_DOWN_ACK_KAFKA_TOPIC_NAME"),
+			PRODUCE_SINK_CHANGE_KAFKA_TOPIC_NAME:     viper.GetString("PRODUCE_SINK_CHANGE_KAFKA_TOPIC_NAME"),
 		},
 
-		BusinessLogicConfig: BusinessLogicConfig{
-
-		},
+		BusinessLogicConfig: BusinessLogicConfig{},
 
 		// APIClientConfig: APIClientConfig{
 		// },

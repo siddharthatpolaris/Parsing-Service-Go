@@ -6,9 +6,9 @@ import(
 
 var migrationModels = []interface{}{
 	&decoder.CommandMapping{},
-	&decoder.SwVersion{},
-	&decoder.CommandMappingSwVersion{},
+	// &decoder.SwVersion{},
+	// &decoder.CommandMappingSwVersion{},
 	&decoder.DeserializeLogics{},
-	&decoder.DeserializeLogicSwVersion{},
+	// &decoder.DeserializeLogicSwVersion{},
 
 }

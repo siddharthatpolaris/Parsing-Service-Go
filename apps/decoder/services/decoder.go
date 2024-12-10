@@ -1,11 +1,12 @@
 package services
 
 import (
-	
 	"errors"
 	"fmt"
 	daoInterfaces "parsing-service/apps/decoder/dao_interfaces"
 	"parsing-service/apps/decoder/models"
+	kafkaIntf "parsing-service/apps/kafka/service_interfaces"
+	"parsing-service/pkg/config"
 	"parsing-service/pkg/logger"
 	"strconv"
 	"strings"
@@ -15,17 +16,23 @@ type DecoderService struct {
 	CommandMappingDAO    daoInterfaces.ICommandMappingDAO
 	DeserializeLogicsDAO daoInterfaces.IDeserializeLogicsDAO
 	logger               logger.ILogger
+	KafkaProducer        kafkaIntf.IKafkaProducer
+	cfg                  *config.Configuration
 	// mu                   sync.Mutex
 }
 
 func NewDecoder(
 	commandMappingDAO daoInterfaces.ICommandMappingDAO,
 	deserializeLogicsDAO daoInterfaces.IDeserializeLogicsDAO,
-	logger logger.ILogger) *DecoderService {
+	logger logger.ILogger,
+	kafkaProducer kafkaIntf.IKafkaProducer,
+	cfg *config.Configuration) *DecoderService {
 	return &DecoderService{
 		CommandMappingDAO:    commandMappingDAO,
 		DeserializeLogicsDAO: deserializeLogicsDAO,
 		logger:               logger,
+		KafkaProducer:        kafkaProducer,
+		cfg:                  cfg,
 	}
 }
 
@@ -210,11 +217,10 @@ func checkPacketIntegrity(part []byte, offset int, dcuPort int) (bool, error) {
 			return false, errors.New("start byte not defined")
 		}
 		part = part[1:]
-
 		if len(part) >= 11 {
 			stopBytePos := 11 + int(part[10])
 			fmt.Println(stopBytePos)
-			if len(part) >= stopBytePos + 2 {
+			if len(part) >= stopBytePos+2 {
 				order := "normal"
 				crcInPacket, err := DeserializeUInt16(part[stopBytePos:stopBytePos+2], order)
 				if err != nil {
@@ -232,10 +238,10 @@ func checkPacketIntegrity(part []byte, offset int, dcuPort int) (bool, error) {
 
 				if crcComputed == crcInPacket {
 					return true, nil
-				}else {
+				} else {
 					return false, errors.New(fmt.Sprintf("DECODE_TAP:: CRC Error DCU :: %d bytes :: %v CRC in packet %X CRC COMPUTED %X", dcuPort, part, crcInPacket, crcComputed))
 				}
-			}else {
+			} else {
 				return false, errors.New("stop byte issue")
 			}
 		}
@@ -246,6 +252,10 @@ func checkPacketIntegrity(part []byte, offset int, dcuPort int) (bool, error) {
 
 func getMyTapPacket(part []byte, offset int) (*TAPPacket, error) {
 	myTapPacket := NewTAPPacket()
+	if len(part) < 11 {
+		return myTapPacket, errors.New("error in getting tap packlet as part length is less than 11")
+
+	}
 	stopBytePos := 11 + int(part[10])
 	var commandID string
 
@@ -276,47 +286,64 @@ func getMyTapPacket(part []byte, offset int) (*TAPPacket, error) {
 		}
 	} else {
 		// fmt.Println("y")
-		if len(part) >= stopBytePos - offset {
+		if len(part) >= stopBytePos-offset {
 			err := myTapPacket.Deserialize(part[0 : stopBytePos-offset])
 			if err != nil {
 				fmt.Println("error in deserializing tap packet")
 				return myTapPacket, err
 			}
-		}else {
+		} else {
 			fmt.Println("error in part size before deserializing tap packet")
 			return myTapPacket, err
 		}
-		
+
 		//----
-		myTapPacket.DataLen -= uint8(offset)		
+		myTapPacket.DataLen -= uint8(offset)
 	}
 
 	return myTapPacket, nil
 }
 
-func getTwUplinkPackets(data []byte) ([]map[string]interface{}, error) {
-	twPacket := NewTapWrapperPacket()
-	var tapPackets []map[string]interface{}
-	isValid := twPacket.validateUplinkPacket(data) 
+// func (s *DecoderService) getTwUplinkPackets(data []byte) ([]map[string]interface{}, error) {
+// 	twPacket := NewTapWrapperPacket()
+// 	var tapPackets []map[string]interface{}
+// 	var dcuDiagnosticPackets []map[string]interface{}
+// 	var downAckPackets []map[string]interface{}
+// 	var sinkChangePackets []map[string]interface{}
 
-	if isValid {
-		dataLen := len(data) - 10
-		index := 4
-		// dataLen := 2
-		// index :=0
+// 	isValid := twPacket.validateUplinkPacket(data)
 
-		for (dataLen > index) {
-			newIndex, tempPacket := twPacket.deframeUplinkPacket(data, index)
-			index += newIndex
-			if tempPacket["MessageType"] == "Uplink_Msg" {
-				tapPackets = append(tapPackets, tempPacket)
-			}
-			st := fmt.Sprintf("dataLen %d, Index %d  info %v", dataLen, index, tempPacket)
-			fmt.Println(st)
-		}
-		fmt.Println(len(tapPackets))
-		return tapPackets, nil
-	}
-	return nil, errors.New("invalid wp packet")
+// 	if isValid {
+// 		dataLen := len(data) - 10 // dcu time, dcu serial and CRC length removed
+// 		index := 4                // wp header length
+// 		// dataLen := 2
+// 		// index :=0
 
-}
+// 		for dataLen > index {
+// 			newIndex, tempPacket := twPacket.deframeUplinkPacket(data, index)
+// 			index += newIndex
+// 			if tempPacket["MessageType"] == "Uplink_Msg" {
+// 				tapPackets = append(tapPackets, tempPacket)
+// 			} else if tempPacket["MessageType"] == "DCU_Diag" {
+// 				dcuDiagnosticPackets = append(dcuDiagnosticPackets, tempPacket)
+// 			} else if tempPacket["MessageType"] == "Down_Ack" {
+// 				downAckPackets = append(downAckPackets, tempPacket)
+// 			} else if tempPacket["MessageType"] == "Sink_Change" {
+// 				sinkChangePackets = append(sinkChangePackets, tempPacket)
+// 			}
+// 			st := fmt.Sprintf("dataLen %d, Index %d  info %v", dataLen, index, tempPacket)
+// 			fmt.Println(st)
+// 		}
+// 		//1
+// 		go s.KafkaProducer.ProduceMessagesInBatch(s.cfg.KafkaTopicsConfig.PRODUCE_DCU_DIAGNOSTIC_KAFKA_TOPIC_NAME, dcuDiagnosticPackets)
+// 		//2
+// 		go s.KafkaProducer.ProduceMessagesInBatch(s.cfg.KafkaTopicsConfig.PRODUCE_DOWN_ACK_KAFKA_TOPIC_NAME, downAckPackets)
+// 		//3
+// 		go s.KafkaProducer.ProduceMessagesInBatch(s.cfg.KafkaTopicsConfig.PRODUCE_SINK_CHANGE_KAFKA_TOPIC_NAME, sinkChangePackets)
+
+// 		fmt.Println(len(tapPackets))
+// 		return tapPackets, nil
+// 	}
+// 	return nil, errors.New("invalid wp packet")
+
+// }
